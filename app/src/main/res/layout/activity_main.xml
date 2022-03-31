@@ -7,7 +7,7 @@
     tools:context=".MainActivity">
 
     <androidx.fragment.app.FragmentContainerView
-        android:name="com.example.todoibrahimaberete_brayanekutlar.tasklist"
+        android:name="com.example.todoibrahimaberete_brayanekutlar.tasklist.TaskListFragment"
         android:id="@+id/fragment_tasklist"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
