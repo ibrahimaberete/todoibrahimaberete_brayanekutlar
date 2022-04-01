@@ -49,5 +49,12 @@ class TaskListFragment : Fragment() {
 
         }
 
+        adapter.onClickDelete = { task ->
+            // Supprimer la tâche
+            taskList = taskList - task
+            adapter.submitList(taskList)
+        }
+
     }
+
 }

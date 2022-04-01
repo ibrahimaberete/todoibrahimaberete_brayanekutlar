@@ -4,6 +4,7 @@ import android.system.Os.bind
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageButton
 import android.widget.TextView
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
@@ -20,6 +21,9 @@ object TaskDiffCallback : DiffUtil.ItemCallback<Task>() {
 
 // l'IDE va râler ici car on a pas encore implémenté les méthodes nécessaires
 class TaskListAdapter : ListAdapter<Task,TaskListAdapter.TaskViewHolder>(TaskDiffCallback) {
+    // Déclaration de la variable lambda dans l'adapter:
+    var onClickDelete: (Task) -> Unit = {}
+
 
     // on utilise `inner` ici afin d'avoir accès aux propriétés de l'adapter directement
     inner class TaskViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
@@ -29,6 +33,8 @@ class TaskListAdapter : ListAdapter<Task,TaskListAdapter.TaskViewHolder>(TaskDif
           titleView.text = task.title
             val descriptionView = itemView.findViewById<TextView>(R.id.task_description)
             descriptionView.text = task.description
+            val deleteButton = itemView.findViewById<ImageButton>(R.id.imageButton)
+            deleteButton.setOnClickListener { onClickDelete(task) }
         }
 
     }
