@@ -9,12 +9,15 @@ import android.widget.LinearLayout
 import android.widget.ListAdapter
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.todoibrahimaberete_brayanekutlar.R
 import com.example.todoibrahimaberete_brayanekutlar.databinding.FragmentTaskListBinding
 import com.example.todoibrahimaberete_brayanekutlar.form.FormActivity
+import com.example.todoibrahimaberete_brayanekutlar.network.Api
 import com.google.android.material.floatingactionbutton.FloatingActionButton
+import kotlinx.coroutines.launch
 import java.util.*
 
 
@@ -87,6 +90,18 @@ class TaskListFragment : Fragment() {
             intent.putExtra("task", task)
             updateTask.launch(intent)
 
+
+        }
+
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Ici on ne va pas gérer les cas d'erreur donc on force le crash avec "!!"
+        lifecycleScope.launch {
+            val userInfo = Api.userWebService.getInfo().body()!!
+            val userInfos = binding.textView
+            userInfos.text = "${userInfo.firstName} ${userInfo.lastName}"
 
         }
 
