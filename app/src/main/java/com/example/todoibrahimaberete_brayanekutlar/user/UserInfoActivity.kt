@@ -7,12 +7,14 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
+import android.provider.MediaStore
 import android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS
 import android.util.Log
 import android.view.View
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.launch
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContentProviderCompat.requireContext
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import coil.load
@@ -25,10 +27,12 @@ import com.example.todoibrahimaberete_brayanekutlar.network.UserWebService
 import com.google.android.material.snackbar.Snackbar
 import com.google.modernstorage.permissions.RequestAccess
 import com.google.modernstorage.permissions.StoragePermissions
+import com.google.modernstorage.storage.AndroidFileSystem
 import kotlinx.coroutines.launch
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
+import java.util.*
 
 
 class UserInfoActivity : AppCompatActivity(){
@@ -37,28 +41,39 @@ class UserInfoActivity : AppCompatActivity(){
     private val binding get() = _binding!!
     private val webService = Api.userWebService
 
-    private val getPhoto = registerForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
+    private val getPhoto = registerForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+        binding.imageView.load(photoUri) // afficher
+        if (success) {
+            lifecycleScope.launch {
+                webService.updateAvatar(photoUri.toRequestBody())
+            }
 
-        binding.imageView.load(bitmap) // afficher
-
-
-        if (bitmap == null) return@registerForActivityResult
-
-        lifecycleScope.launch {
-            webService.updateAvatar(bitmap.toRequestBody())
+        } else {
+            showMessage("Error taking picture")
         }
 
     }
 
-    // register
-    private fun Uri.toRequestBody(): MultipartBody.Part {
-        val fileInputStream = contentResolver.openInputStream(this)!!
-        val fileBody = fileInputStream.readBytes().toRequestBody()
-        return MultipartBody.Part.createFormData(
-            name = "avatar",
-            filename = "temp.jpeg",
-            body = fileBody
-        )
+    private val fileSystem by lazy { AndroidFileSystem(this) } // pour interagir avec le stockage
+
+    private lateinit var photoUri: Uri // on stockera l'uri dans cette variable
+
+    private val requestCamera =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { accepted ->
+
+            getPhoto.launch(photoUri)
+        }
+
+    val requestWriteAccess = registerForActivityResult(RequestAccess()) { accepted ->
+        val camPermission = Manifest.permission.CAMERA
+        val permissionStatus = checkSelfPermission(camPermission)
+        val isAlreadyAccepted = permissionStatus == PackageManager.PERMISSION_GRANTED
+        val isExplanationNeeded = shouldShowRequestPermissionRationale(camPermission)
+        when {
+            isAlreadyAccepted -> getPhoto.launch(photoUri)// lancer l'action souhaitée
+            isExplanationNeeded -> showMessage("error") // afficher une explication
+            else -> requestCamera.launch(camPermission)
+        }
     }
 
     private val galleryLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
@@ -73,13 +88,8 @@ class UserInfoActivity : AppCompatActivity(){
         }
         // au retour de la galerie on fera quasiment pareil qu'au retour de la caméra mais avec une URI àla place du bitmap
     }
-    private val requestCamera =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { accepted ->
-            if (accepted)
-                getPhoto.launch();
-            // lancer l'action souhaitée
-            else showMessage("error")// afficher une explication
-        }
+
+
     private fun showMessage(message: String) {
         Snackbar.make(findViewById(android.R.id.content), message, Snackbar.LENGTH_LONG)
             .setAction("Open Settings") {
@@ -91,17 +101,7 @@ class UserInfoActivity : AppCompatActivity(){
             }
             .show()
     }
-    private fun launchCameraWithPermission() {
-        val camPermission = Manifest.permission.CAMERA
-        val permissionStatus = checkSelfPermission(camPermission)
-        val isAlreadyAccepted = permissionStatus == PackageManager.PERMISSION_GRANTED
-        val isExplanationNeeded = shouldShowRequestPermissionRationale(camPermission)
-        when {
-            isAlreadyAccepted -> getPhoto// lancer l'action souhaitée
-                isExplanationNeeded -> showMessage("error") // afficher une explication
-            else -> requestCamera// lancer la demande de permission
-        }
-    }
+
     private fun Bitmap.toRequestBody(): MultipartBody.Part {
         val tmpFile = File.createTempFile("avatar", "jpeg")
         tmpFile.outputStream().use {
@@ -118,7 +118,15 @@ class UserInfoActivity : AppCompatActivity(){
         )
     }
 
-
+    fun launchCameraWithPermissions() {
+        requestWriteAccess.launch(
+            RequestAccess.Args(
+                action = StoragePermissions.Action.READ_AND_WRITE,
+                types = listOf(StoragePermissions.FileType.Image),
+                createdBy = StoragePermissions.CreatedBy.Self
+            )
+        )
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
 
@@ -128,13 +136,19 @@ class UserInfoActivity : AppCompatActivity(){
         val view = binding.root
         setContentView(view)
 
+        // créer et stocker l'uri:
+        photoUri = fileSystem.createMediaStoreUri(
+            filename = "picture-${UUID.randomUUID()}.jpg",
+            collection = MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+            directory = "Todo",
+        )!!
+
         binding.imageView.load("https://goo.gl/gEgYUd") {
             crossfade(true)
             transformations(CircleCropTransformation())
         }
         binding.takePictureButton.setOnClickListener{
-            launchCameraWithPermission()
-            getPhoto.launch()
+            launchCameraWithPermissions()
         }
 
         binding.uploadImageButton.setOnClickListener{
@@ -149,6 +163,7 @@ class UserInfoActivity : AppCompatActivity(){
         }
 
     }
+
     // launcher pour la permission d'accès au stockage
     val requestReadAccess = registerForActivityResult(RequestAccess()) { hasAccess ->
         if (hasAccess) {
@@ -168,6 +183,14 @@ class UserInfoActivity : AppCompatActivity(){
         )
     }
 
-
-
+    // register
+    private fun Uri.toRequestBody(): MultipartBody.Part {
+        val fileInputStream = contentResolver.openInputStream(this)!!
+        val fileBody = fileInputStream.readBytes().toRequestBody()
+        return MultipartBody.Part.createFormData(
+            name = "avatar",
+            filename = "temp.jpeg",
+            body = fileBody
+        )
     }
+}
