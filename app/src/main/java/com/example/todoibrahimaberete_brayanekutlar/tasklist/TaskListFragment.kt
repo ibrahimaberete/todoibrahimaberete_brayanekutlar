@@ -103,9 +103,11 @@ class TaskListFragment : Fragment() {
             val userInfos = binding.textView
             userInfos.text = "${userInfo.firstName} ${userInfo.lastName}"
 
+
         }
 
     }
+
 
 
 }
