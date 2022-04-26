@@ -9,6 +9,7 @@ import android.widget.LinearLayout
 import android.widget.ListAdapter
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -28,12 +29,17 @@ class TaskListFragment : Fragment() {
         Task(id = "id_2", title = "Task 2"),
         Task(id = "id_3", title = "Task 3")
     )
+    private val viewModel: TasksListViewModel by viewModels()
+
     val createTask =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             // ici on récupérera le résultat pour le traiter
             val task = result.data?.getSerializableExtra("task") as? Task
                 ?: return@registerForActivityResult
-            taskList = taskList + task
+            lifecycleScope.launch {
+                viewModel.create(task)
+
+            }
             adapter.submitList(taskList)
         }
     val updateTask =
@@ -41,8 +47,9 @@ class TaskListFragment : Fragment() {
             // ici on récupérera le résultat pour le traiter
             val task = result.data?.getSerializableExtra("task") as? Task
             if (task != null) {
-                taskList = taskList.map {
-                    if (it.id == task.id) task else it
+                lifecycleScope.launch {
+                    viewModel.update(task)
+
                 }
                 adapter.submitList(taskList)
             }
@@ -61,11 +68,12 @@ class TaskListFragment : Fragment() {
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
 
-        adapter.submitList(taskList)
         val recyclerView = binding.recyclerview
         recyclerView.layoutManager = LinearLayoutManager(activity)
         recyclerView.adapter = adapter
+        adapter.submitList(taskList)
         // Instanciation d'un objet task avec des données préremplies:
         val btn = binding.floatingActionButton
         btn.setOnClickListener {
@@ -81,7 +89,10 @@ class TaskListFragment : Fragment() {
 
         adapter.onClickDelete = { task ->
             // Supprimer la tâche
-            taskList = taskList - task
+            lifecycleScope.launch {
+                viewModel.create(task)
+
+            }
             adapter.submitList(taskList)
         }
 
@@ -92,6 +103,14 @@ class TaskListFragment : Fragment() {
 
 
         }
+        lifecycleScope.launch { // on lance une coroutine car `collect` est `suspend`
+            viewModel.tasksStateFlow.collect { newList ->
+                // cette lambda est executée à chaque fois que la liste est mise à jour dans le VM
+                // -> ici, on met à jour la liste dans l'adapter
+                taskList = newList
+                adapter.submitList(taskList)
+            }
+        }
 
     }
 
@@ -99,14 +118,17 @@ class TaskListFragment : Fragment() {
         super.onResume()
         // Ici on ne va pas gérer les cas d'erreur donc on force le crash avec "!!"
         lifecycleScope.launch {
+            viewModel.refresh()
             val userInfo = Api.userWebService.getInfo().body()!!
             val userInfos = binding.textView
             userInfos.text = "${userInfo.firstName} ${userInfo.lastName}"
 
 
+
         }
 
     }
+
 
 
 
