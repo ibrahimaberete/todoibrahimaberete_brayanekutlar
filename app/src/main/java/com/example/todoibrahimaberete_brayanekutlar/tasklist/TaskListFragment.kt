@@ -13,10 +13,13 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import coil.load
+import coil.transform.CircleCropTransformation
 import com.example.todoibrahimaberete_brayanekutlar.R
 import com.example.todoibrahimaberete_brayanekutlar.databinding.FragmentTaskListBinding
 import com.example.todoibrahimaberete_brayanekutlar.form.FormActivity
 import com.example.todoibrahimaberete_brayanekutlar.network.Api
+import com.example.todoibrahimaberete_brayanekutlar.user.UserInfoActivity
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import kotlinx.coroutines.launch
 import java.util.*
@@ -86,6 +89,10 @@ class TaskListFragment : Fragment() {
             createTask.launch(intent)
 
         }
+        binding.avatarImageView.setOnClickListener {
+            val intent = Intent(context, UserInfoActivity::class.java)
+            startActivity(intent)
+        }
 
         adapter.onClickDelete = { task ->
             // Supprimer la tâche
@@ -123,8 +130,10 @@ class TaskListFragment : Fragment() {
             val userInfos = binding.textView
             userInfos.text = "${userInfo.firstName} ${userInfo.lastName}"
 
-
-
+             binding.avatarImageView.load("https://goo.gl/gEgYUd") {
+                 crossfade(true)
+                 transformations(CircleCropTransformation())
+             }
         }
 
     }
